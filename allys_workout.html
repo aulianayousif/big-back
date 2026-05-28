@@ -191,6 +191,11 @@ textarea.inp{resize:none;line-height:1.65;font-size:11px;color:var(--text2);}
       </div>
       <div id="peditor"></div>
       <div class="card"><button class="bgh" style="width:100%;margin-bottom:8px" onclick="resetProg()">↺ Reset to Default Program</button><div style="font-size:10px;color:var(--text3);text-align:center">Resets exercises only. All logged data is kept.</div></div>
+      <div class="card">
+        <div style="font-family:var(--display);font-size:22px;letter-spacing:2px;margin-bottom:4px">Nutrition Goals</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.65;margin-bottom:14px">Your daily targets shown on the Eat tab.</div>
+        <div id="tgeditor"></div>
+      </div>
     </div>
     <div class="tab" id="tab-summary">
       <div class="card">
@@ -227,6 +232,8 @@ textarea.inp{resize:none;line-height:1.65;font-size:11px;color:var(--text2);}
    SECTION: TARGETS — Edit via Cowork to update goals
    ============================================================ */
 const TARGETS={cal:2100,prot:200,fat:65,carbs:220,fiber:30,steps:8000};
+function getTargets(){const s=DB.get('targets');return s?Object.assign({},TARGETS,s):Object.assign({},TARGETS);}
+function setTargets(t){DB.set('targets',t);}
 
 /* ============================================================
    SECTION: DEFAULT_PROGRAM — Edit via Cowork for permanent
@@ -383,11 +390,12 @@ function updWONote(val){const wo=getWO(cdate);if(!wo)return;wo.note=val;setWO(cd
 /* EAT */
 function rEat(){
   const nu=getNU(cdate);updCal(nu);
-  document.getElementById('mgrid').innerHTML=MDS.map(m=>{const v=nu[m.k]||0,p=clamp(Math.round(v/m.t*100),0,100),ov=v>m.t;return '<div class="mcard"><div class="lbl">'+m.l+'</div><div class="mv'+(ov?' ov':'')+'">'+v+'<span style="font-size:11px;color:var(--text3);margin-left:2px">'+m.u+'</span></div><div class="bw"><div class="bf'+(ov?' ov':'')+'" style="width:'+p+'%;background:'+(ov?'var(--red)':m.c)+'"></div></div><div class="mp">'+p+'% of '+m.t+m.u+'</div></div>';}).join('');
-  const fl=[{k:'cal',l:'Calories',t:2100,u:'kcal',s:'1'},{k:'prot',l:'Protein',t:200,u:'g',s:'1'},{k:'fat',l:'Fat',t:65,u:'g',s:'1'},{k:'carbs',l:'Carbs',t:220,u:'g',s:'1'},{k:'fiber',l:'Fiber',t:30,u:'g',s:'1'},{k:'steps',l:'Steps',t:8000,u:'',s:'100'}];
+  const tg=getTargets();
+  document.getElementById('mgrid').innerHTML=MDS.map(m=>{const mt=tg[m.k]||m.t;const v=nu[m.k]||0,p=clamp(Math.round(v/mt*100),0,100),ov=v>mt;return '<div class="mcard"><div class="lbl">'+m.l+'</div><div class="mv'+(ov?' ov':'')+'">'+v+'<span style="font-size:11px;color:var(--text3);margin-left:2px">'+m.u+'</span></div><div class="bw"><div class="bf'+(ov?' ov':'')+'" style="width:'+p+'%;background:'+(ov?'var(--red)':m.c)+'"></div></div><div class="mp">'+p+'% of '+mt+m.u+'</div></div>';}).join('');
+  const fl=[{k:'cal',l:'Calories',t:tg.cal,u:'kcal',s:'1'},{k:'prot',l:'Protein',t:tg.prot,u:'g',s:'1'},{k:'fat',l:'Fat',t:tg.fat,u:'g',s:'1'},{k:'carbs',l:'Carbs',t:tg.carbs,u:'g',s:'1'},{k:'fiber',l:'Fiber',t:tg.fiber,u:'g',s:'1'},{k:'steps',l:'Steps',t:tg.steps,u:'',s:'100'}];
   document.getElementById('nuinp').innerHTML='<div class="lbl" style="margin-bottom:10px">Log Your Intake</div>'+fl.map(f=>'<div style="margin-bottom:10px"><div class="lbl">'+f.l+' <span style="color:var(--text3);font-weight:normal;text-transform:none;letter-spacing:0;font-size:10px">/ '+f.t+f.u+'</span></div><input class="inp" type="number" inputmode="numeric" pattern="[0-9]*" step="'+f.s+'" value="'+(nu[f.k]||'')+'" placeholder="0" oninput="saveNF(\''+f.k+'\',this.value)"/></div>').join('');
 }
-function updCal(nu){const e=nu.cal||0,r=TARGETS.cal-e,p=clamp(Math.round(e/TARGETS.cal*100),0,100);const re=document.getElementById('crem');re.textContent=r;re.className='cr '+(r<0?'ov':r<300?'wn':'gd');document.getElementById('ceat').textContent=e;const b=document.getElementById('cbar');b.style.width=p+'%';b.className='bf'+(e>TARGETS.cal?' ov':'');}
+function updCal(nu){const tg=getTargets();const e=nu.cal||0,r=tg.cal-e,p=clamp(Math.round(e/tg.cal*100),0,100);const re=document.getElementById('crem');re.textContent=r;re.className='cr '+(r<0?'ov':r<300?'wn':'gd');document.getElementById('ceat').textContent=e;const b=document.getElementById('cbar');b.style.width=p+'%';b.className='bf'+(e>tg.cal?' ov':'');}
 function saveNF(k,v){const nu=getNU(cdate);nu[k]=parseFloat(v)||0;setNU(cdate,nu);updCal(nu);}
 
 /* MEASURE */
@@ -412,6 +420,7 @@ function saveM(){const d=document.getElementById('mdate').value,data={};MF.forEa
 function rProg(){
   document.getElementById('pdtabs').innerHTML=DK.map(k=>'<button class="pdt'+(apd===k?' on':'')+'" onclick="setPD('+k+')">'+DL[k].slice(0,3)+'</button>').join('');
   rPE();
+  rTargets();
 }
 function setPD(k){apd=k;rProg();}
 function rPE(){
@@ -424,6 +433,13 @@ function updEX(ei,field,val){const p=getProg();p[apd].exercises[ei][field]=val;s
 function delEx(ei){if(!confirm('Remove this exercise?'))return;const p=getProg();p[apd].exercises.splice(ei,1);setProg(p);rPE();toast('Exercise removed');}
 function addEx(){const p=getProg();if(!p[apd])p[apd]={name:DL[apd],exercises:[]};p[apd].exercises.push({id:uid(),name:'New Exercise',sets:3,reps:'8-12',rest:90,note:''});setProg(p);rPE();setTimeout(()=>document.getElementById('peditor').lastElementChild?.scrollIntoView({behavior:'smooth'}),100);toast('Exercise added');}
 function resetProg(){if(!confirm('Reset to default program? All logged data is kept.'))return;setProg(JSON.parse(JSON.stringify(DEFAULT_PROGRAM)));rPE();toast('Reset to defaults');}
+function rTargets(){
+  const t=getTargets();
+  const fs=[{k:'cal',l:'Calories',u:'kcal'},{k:'prot',l:'Protein',u:'g'},{k:'fat',l:'Fat',u:'g'},{k:'carbs',l:'Carbs',u:'g'},{k:'fiber',l:'Fiber',u:'g'},{k:'steps',l:'Daily Steps',u:'steps'}];
+  document.getElementById('tgeditor').innerHTML=fs.map(f=>'<div style="margin-bottom:10px"><div class="lbl">'+f.l+' <span style="color:var(--text3);font-weight:normal;text-transform:none;letter-spacing:0;font-size:10px">('+f.u+' / day)</span></div><input class="inp" type="number" inputmode="numeric" pattern="[0-9]*" value="'+t[f.k]+'" placeholder="'+TARGETS[f.k]+'" oninput="updTG(\''+f.k+'\',this.value)"/></div>').join('')+'<button class="svbtn us" id="tgbtn" onclick="saveTG()">Save Goals</button>';
+}
+function updTG(k,v){const t=getTargets(),val=parseFloat(v);if(!isNaN(val)&&val>0)t[k]=val;setTargets(t);const b=document.getElementById('tgbtn');if(b){b.className='svbtn us';b.textContent='Save Goals';}}
+function saveTG(){const b=document.getElementById('tgbtn');b.className='svbtn sv';b.textContent='Saved!';setTimeout(()=>{b.className='svbtn us';b.textContent='Save Goals';},2500);toast('Nutrition goals updated');}
 
 /* SUMMARY */
 function genSum(){
@@ -459,7 +475,7 @@ function genSum(){
     });
     t+='\nNUTRITION — Daily Averages\n'+'─'.repeat(38)+'\n';
     if(!nd.length)t+='No nutrition logged.\n';
-    else{const avg=k=>Math.round(nd.reduce((s,d)=>s+(d.nu[k]||0),0)/nd.length),hit=(v,t2)=>v>=t2?'[HIT]':'[MISS]';t+='Tracked: '+nd.length+'/7 days\nCalories: '+avg('cal')+' / 2100   '+hit(avg('cal'),TARGETS.cal)+'\nProtein:  '+avg('prot')+'g / 200g   '+hit(avg('prot'),TARGETS.prot)+'\nFat:      '+avg('fat')+'g / 65g\nCarbs:    '+avg('carbs')+'g / 220g\nSteps:    '+avg('steps')+' / 8000   '+hit(avg('steps'),TARGETS.steps)+'\n';}
+    else{const avg=k=>Math.round(nd.reduce((s,d)=>s+(d.nu[k]||0),0)/nd.length),hit=(v,t2)=>v>=t2?'[HIT]':'[MISS]';const tg=getTargets();t+='Tracked: '+nd.length+'/7 days\nCalories: '+avg('cal')+' / '+tg.cal+'   '+hit(avg('cal'),tg.cal)+'\nProtein:  '+avg('prot')+'g / '+tg.prot+'g   '+hit(avg('prot'),tg.prot)+'\nFat:      '+avg('fat')+'g / '+tg.fat+'g\nCarbs:    '+avg('carbs')+'g / '+tg.carbs+'g\nSteps:    '+avg('steps')+' / '+tg.steps+'   '+hit(avg('steps'),tg.steps)+'\n';}
     t+='\nWEIGHT\n'+'─'.repeat(38)+'\n';
     if(!wtd.length)t+='No weigh-ins logged.\n';
     else{const ws=wtd.map(d=>d.wt);t+='Logged: '+wtd.length+'/7\nLow: '+Math.min(...ws)+' lbs  |  High: '+Math.max(...ws)+' lbs\n7-day avg: '+(ws.reduce((a,b)=>a+b,0)/ws.length).toFixed(1)+' lbs\n';wtd.forEach(d=>{t+='  '+d.d+': '+d.wt+' lbs\n';});}
